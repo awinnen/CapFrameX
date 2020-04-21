@@ -9,6 +9,8 @@
  
 */
 
+using OpenHardwareMonitor.Hardware.Helper;
+using OpenHardwareMonitor.Hardware.Nvidia.Structures;
 using System;
 using System.Globalization;
 using System.Text;
@@ -186,6 +188,7 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
 
         private uint[] GetClocks()
         {
+            GetCurrentVoltage();
             NvClocks allClocks = new NvClocks();
             allClocks.Version = NVAPI.GPU_CLOCKS_VER;
             allClocks.Clock = new uint[NVAPI.MAX_CLOCKS_PER_GPU];
@@ -195,6 +198,21 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
                 return allClocks.Clock;
             }
             return null;
+        }
+
+        private uint GetCurrentVoltage()
+        {
+            var voltageStatusReference = new PrivateVoltageStatusV1();
+            var status = NVAPI.NvAPI_GPU_GetCurrentVoltage(
+                handle, ref voltageStatusReference);
+
+            uint volt = 0;
+            if (status == NvStatus.OK)
+            {
+                //volt = voltageStatusReference;
+            }
+
+            return volt;
         }
 
         public override void Update()
