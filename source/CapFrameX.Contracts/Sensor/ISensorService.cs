@@ -1,8 +1,7 @@
 ﻿using CapFrameX.Contracts.Overlay;
 using CapFrameX.Data.Session.Contracts;
+using OpenHardwareMonitor.Hardware;
 using System;
-using System.Collections.Generic;
-using System.Reactive.Subjects;
 
 namespace CapFrameX.Contracts.Sensor
 {
