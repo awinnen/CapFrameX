@@ -74,6 +74,9 @@
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="NvAPIWrapper, Version=0.8.0.98, Culture=neutral, PublicKeyToken=310fd07b25df79b3, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\NvAPIWrapper.Net.0.8.0.98\lib\net45\NvAPIWrapper.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Management" />
   </ItemGroup>
@@ -101,9 +104,6 @@
     <Compile Include="Hardware\HDD\SSDPlextor.cs" />
     <Compile Include="Hardware\HDD\SSDSamsung.cs" />
     <Compile Include="Hardware\HDD\SSDSandforce.cs" />
-    <Compile Include="Hardware\Helper\ExtensionMethods.cs" />
-    <Compile Include="Hardware\Helper\IHandle.cs" />
-    <Compile Include="Hardware\Helper\ValueTypeReference.cs" />
     <Compile Include="Hardware\IControl.cs" />
     <Compile Include="Hardware\IOControlCode.cs" />
     <Compile Include="Hardware\Computer.cs" />
@@ -119,12 +119,6 @@
     <Compile Include="Hardware\LPC\NCT677X.cs" />
     <Compile Include="Hardware\Mainboard\GigabyteTAMG.cs" />
     <Compile Include="Hardware\Mainboard\Identification.cs" />
-    <Compile Include="Hardware\Nvidia\NVML.cs" />
-    <Compile Include="Hardware\Nvidia\Structures\IAllocatable.cs" />
-    <Compile Include="Hardware\Nvidia\Structures\IInitializable.cs" />
-    <Compile Include="Hardware\Nvidia\Structures\PrivateVoltageStatusV1.cs" />
-    <Compile Include="Hardware\Nvidia\Structures\StructureVersion.cs" />
-    <Compile Include="Hardware\Nvidia\Structures\StructureVersionAttribute.cs" />
     <Compile Include="Hardware\Opcode.cs" />
     <Compile Include="Hardware\OperatingSystem.cs" />
     <Compile Include="Hardware\RAM\GenericRAM.cs" />
@@ -158,7 +152,6 @@
     <Compile Include="Hardware\Mainboard\Model.cs" />
     <Compile Include="Hardware\SMBIOS.cs" />
     <Compile Include="Hardware\Mainboard\SuperIOHardware.cs" />
-    <Compile Include="Hardware\Nvidia\NVAPI.cs" />
     <Compile Include="Hardware\Nvidia\NvidiaGPU.cs" />
     <Compile Include="Hardware\Nvidia\NvidiaGroup.cs" />
     <Compile Include="Hardware\Parameter.cs" />
@@ -197,6 +190,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Hardware\WinRing0.sys" />
     <EmbeddedResource Include="Hardware\WinRing0x64.sys" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

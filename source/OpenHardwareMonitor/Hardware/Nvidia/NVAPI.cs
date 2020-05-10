@@ -8,9 +8,6 @@
 	Copyright (C) 2011 Christian Vallières
  
 */
-
-using OpenHardwareMonitor.Hardware.Helper;
-using OpenHardwareMonitor.Hardware.Nvidia.Structures;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -348,10 +345,6 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
           NvPhysicalGpuHandle gpuHandle, ref NvClocks clocks);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate NvStatus NvAPI_GPU_GetCurrentVoltageDelegate(
-          NvPhysicalGpuHandle gpuHandle, ref PrivateVoltageStatusV1 voltageStatus);
-
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate NvStatus NvAPI_GPU_GetDynamicPstatesInfoExDelegate(
           NvPhysicalGpuHandle gpuHandle,
           ref NvDynamicPstatesInfoEx dynamicPstatesInfoEx);
@@ -417,8 +410,6 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
           NvAPI_GPU_GetTachReading;
         public static readonly NvAPI_GPU_GetAllClocksDelegate
           NvAPI_GPU_GetAllClocks;
-        public static readonly NvAPI_GPU_GetCurrentVoltageDelegate
-         NvAPI_GPU_GetCurrentVoltage;
         public static readonly NvAPI_GPU_GetDynamicPstatesInfoExDelegate
           NvAPI_GPU_GetDynamicPstatesInfoEx;
         public static readonly NvAPI_GPU_GetDynamicPstatesInfoDelegate
@@ -518,7 +509,6 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
                 GetDelegate(0xE5AC921F, out NvAPI_EnumPhysicalGPUs);
                 GetDelegate(0x5F608315, out NvAPI_GPU_GetTachReading);
                 GetDelegate(0x1BD69F49, out NvAPI_GPU_GetAllClocks);
-                GetDelegate(0x465f9bcf, out NvAPI_GPU_GetCurrentVoltage);
                 GetDelegate(0x60DED2ED, out NvAPI_GPU_GetDynamicPstatesInfoEx);
                 GetDelegate(0x189A1FDF, out NvAPI_GPU_GetDynamicPstatesInfo);
                 GetDelegate(0xDA141340, out NvAPI_GPU_GetCoolerSettings);

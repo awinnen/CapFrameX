@@ -1,29 +1,21 @@
-﻿/*
- 
-  This Source Code Form is subject to the terms of the Mozilla Public
-  License, v. 2.0. If a copy of the MPL was not distributed with this
-  file, You can obtain one at http://mozilla.org/MPL/2.0/.
- 
-  Copyright (C) 2009-2020 Michael Möller <mmoeller@openhardwaremonitor.org>
-	Copyright (C) 2011 Christian Vallières
- 
-*/
-
-using OpenHardwareMonitor.Hardware.Helper;
-using OpenHardwareMonitor.Hardware.Nvidia.Structures;
+﻿using NvAPIWrapper.GPU;
+using NvAPIWrapper.Native;
+using NvAPIWrapper.Native.Display.Structures;
+using NvAPIWrapper.Native.GPU;
+using NvAPIWrapper.Native.GPU.Structures;
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace OpenHardwareMonitor.Hardware.Nvidia
 {
     internal class NvidiaGPU : Hardware
     {
-
         private readonly int adapterIndex;
-        private readonly NvPhysicalGpuHandle handle;
-        private readonly NvDisplayHandle? displayHandle;
-        private readonly NVML.NvmlDevice? device;
+        private readonly PhysicalGPUHandle handle;
+        private readonly DisplayHandle? displayHandle;
+        private readonly PhysicalGPU physicalGPU;
 
         private readonly Sensor[] temperatures;
         private readonly Sensor fan;
@@ -34,41 +26,44 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
         private readonly Sensor memoryUsed;
         private readonly Sensor memoryFree;
         private readonly Sensor memoryAvail;
-        private readonly Sensor power;
-        private readonly Sensor pcieThroughputRx;
-        private readonly Sensor pcieThroughputTx;
+        private readonly Sensor boardPower;
+        private readonly Sensor gpuPower;
         private readonly Control fanControl;
 
-        public NvidiaGPU(int adapterIndex, NvPhysicalGpuHandle handle,
-          NvDisplayHandle? displayHandle, ISettings settings)
-          : base(GetName(handle), new Identifier("nvidiagpu",
+        public NvidiaGPU(int adapterIndex, PhysicalGPUHandle handle,
+          DisplayHandle? displayHandle, ISettings settings)
+          : base(GPUApi.GetFullName(handle), new Identifier("nvidiagpu",
               adapterIndex.ToString(CultureInfo.InvariantCulture)), settings)
         {
             this.adapterIndex = adapterIndex;
             this.handle = handle;
             this.displayHandle = displayHandle;
+            physicalGPU = new PhysicalGPU(handle);
 
-            NvGPUThermalSettings thermalSettings = GetThermalSettings();
-            temperatures = new Sensor[thermalSettings.Count];
+            var gPUThermalInformation = physicalGPU.ThermalInformation;
+            var thermalSensors = gPUThermalInformation.ThermalSensors.ToList();
+            temperatures = new Sensor[thermalSensors.Count];
             for (int i = 0; i < temperatures.Length; i++)
             {
-                NvSensor sensor = thermalSettings.Sensor[i];
+                GPUThermalSensor sensor = thermalSensors[i];
                 string name;
                 switch (sensor.Target)
                 {
-                    case NvThermalTarget.BOARD: name = "GPU Board"; break;
-                    case NvThermalTarget.GPU: name = "GPU Core"; break;
-                    case NvThermalTarget.MEMORY: name = "GPU Memory"; break;
-                    case NvThermalTarget.POWER_SUPPLY: name = "GPU Power Supply"; break;
-                    case NvThermalTarget.UNKNOWN: name = "GPU Unknown"; break;
+                    case ThermalSettingsTarget.None: name = "None"; break;
+                    case ThermalSettingsTarget.Board: name = "GPU Board"; break;
+                    case ThermalSettingsTarget.GPU: name = "GPU Core"; break;
+                    case ThermalSettingsTarget.Memory: name = "GPU Memory"; break;
+                    case ThermalSettingsTarget.PowerSupply: name = "GPU Power Supply"; break;
+                    case ThermalSettingsTarget.VisualComputingBoard: name = "Visual Computing Board"; break;
+                    case ThermalSettingsTarget.VisualComputingInlet: name = "Visual Computing Inlet"; break;
+                    case ThermalSettingsTarget.VisualComputingOutlet: name = "Visual Computing Outlet"; break;
+                    case ThermalSettingsTarget.Unknown: name = "GPU Unknown"; break;
                     default: name = "GPU"; break;
                 }
                 temperatures[i] = new Sensor(name, i, SensorType.Temperature, this,
                   new ParameterDescription[0], settings);
                 ActivateSensor(temperatures[i]);
             }
-
-            fan = new Sensor("GPU", 0, SensorType.Fan, this, settings);
 
             clocks = new Sensor[3];
             clocks[0] = new Sensor("GPU Core", 0, SensorType.Clock, this, settings);
@@ -82,137 +77,21 @@ namespace OpenHardwareMonitor.Hardware.Nvidia
             loads[1] = new Sensor("GPU Frame Buffer", 1, SensorType.Load, this, settings);
             loads[2] = new Sensor("GPU Video Engine", 2, SensorType.Load, this, settings);
             loads[3] = new Sensor("GPU Bus Interface", 3, SensorType.Load, this, settings);
-            memoryLoad = new Sensor("GPU Memory", 4, SensorType.Load, this, settings);
+            memoryLoad = new Sensor("GPU Memory", 0, SensorType.Load, this, settings);
             memoryFree = new Sensor("GPU Memory Free", 1, SensorType.SmallData, this, settings);
             memoryUsed = new Sensor("GPU Memory Used", 2, SensorType.SmallData, this, settings);
             memoryAvail = new Sensor("GPU Memory Total", 3, SensorType.SmallData, this, settings);
             control = new Sensor("GPU Fan", 0, SensorType.Control, this, settings);
-
-            NvGPUCoolerSettings coolerSettings = GetCoolerSettings();
-            if (coolerSettings.Count > 0)
-            {
-                fanControl = new Control(control, settings,
-                  coolerSettings.Cooler[0].DefaultMin,
-                  coolerSettings.Cooler[0].DefaultMax);
-                fanControl.ControlModeChanged += ControlModeChanged;
-                fanControl.SoftwareControlValueChanged += SoftwareControlValueChanged;
-                ControlModeChanged(fanControl);
-                control.Control = fanControl;
-            }
-
-            if (NVML.IsInitialized)
-            {
-                if (NVAPI.NvAPI_GPU_GetBusId != null &&
-                    NVAPI.NvAPI_GPU_GetBusId(handle, out uint busId) == NvStatus.OK)
-                {
-                    if (NVML.NvmlDeviceGetHandleByPciBusId != null &&
-                      NVML.NvmlDeviceGetHandleByPciBusId(
-                      "0000:" + busId.ToString("X2") + ":00.0", out var result)
-                      == NVML.NvmlReturn.Success)
-                    {
-                        device = result;
-                        power = new Sensor("GPU Power", 0, SensorType.Power, this, settings);
-                        pcieThroughputRx = new Sensor("GPU PCIE Rx", 0,
-                          SensorType.Throughput, this, settings);
-                        pcieThroughputTx = new Sensor("GPU PCIE Tx", 1,
-                          SensorType.Throughput, this, settings);
-                    }
-                }
-            }
+            fan = new Sensor("GPU Fan", 1, SensorType.Fan, this, settings);
+            gpuPower = new Sensor("GPU Power", 0, SensorType.Power, this, settings);
+            boardPower = new Sensor("Board Power", 1, SensorType.Power, this, settings);
 
             Update();
-        }
-
-        private static string GetName(NvPhysicalGpuHandle handle)
-        {
-            string gpuName;
-            if (NVAPI.NvAPI_GPU_GetFullName(handle, out gpuName) == NvStatus.OK)
-            {
-                return "NVIDIA " + gpuName.Trim();
-            }
-            else
-            {
-                return "NVIDIA";
-            }
         }
 
         public override HardwareType HardwareType
         {
             get { return HardwareType.GpuNvidia; }
-        }
-
-        private NvGPUThermalSettings GetThermalSettings()
-        {
-            NvGPUThermalSettings settings = new NvGPUThermalSettings();
-            settings.Version = NVAPI.GPU_THERMAL_SETTINGS_VER;
-            settings.Count = NVAPI.MAX_THERMAL_SENSORS_PER_GPU;
-            settings.Sensor = new NvSensor[NVAPI.MAX_THERMAL_SENSORS_PER_GPU];
-            if (!(NVAPI.NvAPI_GPU_GetThermalSettings != null &&
-              NVAPI.NvAPI_GPU_GetThermalSettings(handle, (int)NvThermalTarget.ALL,
-                ref settings) == NvStatus.OK))
-            {
-                settings.Count = 0;
-            }
-            return settings;
-        }
-
-        private NvGPUCoolerSettings GetCoolerSettings()
-        {
-            NvGPUCoolerSettings settings = new NvGPUCoolerSettings();
-            settings.Version = NVAPI.GPU_COOLER_SETTINGS_VER;
-            settings.Cooler = new NvCooler[NVAPI.MAX_COOLER_PER_GPU];
-            if (!(NVAPI.NvAPI_GPU_GetCoolerSettings != null &&
-              NVAPI.NvAPI_GPU_GetCoolerSettings(handle, 0,
-                ref settings) == NvStatus.OK))
-            {
-                settings.Count = 0;
-            }
-            return settings;
-        }
-
-        private NvFanCoolersStatus GetFanCoolersStatus()
-        {
-            var coolers = new NvFanCoolersStatus();
-            coolers.Version = NVAPI.GPU_FAN_COOLERS_STATUS_VER;
-            coolers.Items =
-              new NvFanCoolersStatusItem[NVAPI.MAX_FAN_COOLERS_STATUS_ITEMS];
-
-            if (!(NVAPI.NvAPI_GPU_ClientFanCoolersGetStatus != null &&
-               NVAPI.NvAPI_GPU_ClientFanCoolersGetStatus(handle, ref coolers)
-               == NvStatus.OK))
-            {
-                coolers.Count = 0;
-            }
-            return coolers;
-        }
-
-        private uint[] GetClocks()
-        {
-            GetCurrentVoltage();
-            NvClocks allClocks = new NvClocks();
-            allClocks.Version = NVAPI.GPU_CLOCKS_VER;
-            allClocks.Clock = new uint[NVAPI.MAX_CLOCKS_PER_GPU];
-            if (NVAPI.NvAPI_GPU_GetAllClocks != null &&
-              NVAPI.NvAPI_GPU_GetAllClocks(handle, ref allClocks) == NvStatus.OK)
-            {
-                return allClocks.Clock;
-            }
-            return null;
-        }
-
-        private uint GetCurrentVoltage()
-        {
-            var voltageStatusReference = new PrivateVoltageStatusV1();
-            var status = NVAPI.NvAPI_GPU_GetCurrentVoltage(
-                handle, ref voltageStatusReference);
-
-            uint volt = 0;
-            if (status == NvStatus.OK)
-            {
-                //volt = voltageStatusReference;
-            }
-
-            return volt;
         }
 
         public override void Update()
