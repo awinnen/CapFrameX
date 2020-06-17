@@ -3,6 +3,7 @@ using CapFrameX.Contracts.Sensor;
 using CapFrameX.Data;
 using CapFrameX.PresentMonInterface;
 using Serilog;
+using Serilog.Core;
 using Serilog.Formatting.Compact;
 using System;
 using System.Collections.Generic;
@@ -107,6 +108,7 @@ namespace CapFrameX
 			Log.Logger = new LoggerConfiguration()
 				.MinimumLevel.Debug()
 				.Enrich.FromLogContext()
+				.AuditTo.File(Path.Combine(path, "CapFrameX.fatal.log"), Serilog.Events.LogEventLevel.Fatal)
 				.WriteTo.File(
 					path: Path.Combine(path, "CapFrameX.log"),
 					fileSizeLimitBytes: 1024 * 10000, // approx 10MB
