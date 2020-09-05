@@ -12,6 +12,7 @@ using CapFrameX.PresentMonInterface;
 using CapFrameX.Statistics.NetStandard;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -40,6 +41,7 @@ namespace CapFrameX.Data
         private readonly ISystemInfo _systemInfo;
         private readonly ProcessList _processList;
         private readonly IRTSSService _rTSSService;
+        private readonly JsonSerializer _jsonSerializer = new JsonSerializer();
 
         public RecordManager(ILogger<RecordManager> logger,
                              IAppConfiguration appConfiguration,
@@ -233,9 +235,21 @@ namespace CapFrameX.Data
             {
                 using (JsonReader jsonReader = new JsonTextReader(stream))
                 {
-                    JsonSerializer serializer = new JsonSerializer();
-                    var session = serializer.Deserialize<Session.Classes.Session>(jsonReader);
+                    var session = _jsonSerializer.Deserialize<Session.Classes.Session>(jsonReader);
                     return session;
+                }
+            }
+        }
+
+        private async Task<(ISessionInfo sessionInfo, string hash, bool isAggregated)> LoadSessionInfoFromJSON(FileInfo fileInfo)
+        {
+            using (var stream = new StreamReader(fileInfo.FullName))
+            {
+                using (JsonReader jsonReader = new JsonTextReader(stream))
+                {
+                    var session = await JObject.LoadAsync(jsonReader);
+                    var info = session.GetValue("Info").ToObject<SessionInfo>();
+                    return (info, session.GetValue("Hash").ToString(), session.GetValue("Runs").Count() > 0);
                 }
             }
         }
@@ -308,8 +322,8 @@ namespace CapFrameX.Data
                             var sessionFromCSV = LoadSessionFromCSV(fileInfo);
                             return Observable.Return(FileRecordInfo.Create(fileInfo, sessionFromCSV.Hash));
                         case ".json":
-                            var sessionFromJSON = LoadSessionFromJSON(fileInfo);
-                            return Observable.Return(FileRecordInfo.Create(fileInfo, sessionFromJSON));
+                            return Observable.FromAsync(() => LoadSessionInfoFromJSON(fileInfo))
+                                .Select(sessionInfoFromJSON => FileRecordInfo.Create(fileInfo, sessionInfoFromJSON.sessionInfo, sessionInfoFromJSON.hash, sessionInfoFromJSON.isAggregated));
                         default:
                             return Observable.Empty<IFileRecordInfo>();
                     }

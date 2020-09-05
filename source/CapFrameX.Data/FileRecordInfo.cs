@@ -81,6 +81,33 @@ namespace CapFrameX.Data
 			PresentationMode = session.Info.PresentationMode;
 		}
 
+		private FileRecordInfo(FileInfo fileInfo, ISessionInfo sessionInfo, string hash, bool isAggragated)
+		{
+			var creationDateTime = sessionInfo.CreationDate.ToLocalTime();
+			FileInfo = fileInfo;
+			FullPath = fileInfo.FullName;
+			Id = sessionInfo.Id.ToString();
+			CreationDate = creationDateTime.ToString("yyyy-MM-dd");
+			CreationTime = creationDateTime.ToString("HH:mm:ss");
+			ProcessName = sessionInfo.ProcessName;
+			ProcessorName = sessionInfo.Processor;
+			GraphicCardName = sessionInfo.GPU;
+			SystemRamInfo = sessionInfo.SystemRam;
+			MotherboardName = sessionInfo.Motherboard;
+			GPUMemoryClock = sessionInfo.GpuMemoryClock;
+			GPUCoreClock = sessionInfo.GpuCoreClock;
+			DriverPackage = sessionInfo.DriverPackage;
+			BaseDriverVersion = sessionInfo.BaseDriverVersion;
+			GPUDriverVersion = sessionInfo.GPUDriverVersion;
+			Comment = sessionInfo.Comment;
+			ProcessName = sessionInfo.ProcessName;
+			IsAggregated = Convert.ToString(isAggragated);
+			IsValid = true;
+			Hash = hash;
+			ApiInfo = sessionInfo.ApiInfo;
+			PresentationMode = sessionInfo.PresentationMode;
+		}
+
 		private FileRecordInfo(FileInfo fileInfo, string hash)
 		{
 			if (fileInfo != null && File.Exists(fileInfo.FullName))
@@ -320,6 +347,26 @@ namespace CapFrameX.Data
 			try
 			{
 				recordInfo = new FileRecordInfo(fileInfo, session);
+			}
+			catch (ArgumentException)
+			{
+				// Log
+			}
+			catch (Exception)
+			{
+				// Log
+			}
+
+			return recordInfo;
+		}
+
+		public static IFileRecordInfo Create(FileInfo fileInfo, ISessionInfo sessionInfo, string sessionHash, bool isAggregated)
+		{
+			FileRecordInfo recordInfo = null;
+
+			try
+			{
+				recordInfo = new FileRecordInfo(fileInfo, sessionInfo, sessionHash, isAggregated);
 			}
 			catch (ArgumentException)
 			{
